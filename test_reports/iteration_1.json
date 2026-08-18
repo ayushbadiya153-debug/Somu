@@ -1,0 +1,41 @@
+{
+  "summary": "Full backend + frontend regression of NexusTrade (Delta India trading dashboard). Seeded MongoDB-based sessions per /app/auth_testing.md, exercised all documented endpoints, and Playwright-validated every documented page/testid on desktop + mobile. 30/30 backend tests pass. 10/11 frontend flows pass; the only failure is a UX lag on the nav's engine-status badge (10s poll) — dashboard state itself updates immediately.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/logout", "issue": "Only accepts logout via cookie (Cookie param), not via Authorization Bearer header. Non-blocking since frontend uses cookie, but inconsistent with the rest of the API which supports both."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Layout nav-engine-status", "issue": "Engine status badge in the nav polls every 10s and does not refresh when the user clicks Start/Stop from Dashboard. So the nav shows 'Engine Idle' for up to 10s after starting. Consider pushing engine state via context or invalidating on start/stop actions.", "selector": "[data-testid=\"nav-engine-status\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Trade page /trade", "issues": ["React hydration warning: <span> instrumentation wrappers rendered inside <option> elements (probably from the visual-editor x-* instrumentation). Not user-visible but pollutes the console with 'In HTML, <span> cannot be a child of <option>' errors."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Optional: When user clicks engine start/stop from Dashboard, broadcast the new engine state (via context or event) so Layout's nav badge updates immediately instead of waiting for the 10s poll.",
+    "Optional: Suppress or remove the visual-editor x-* option wrappers on the Trade product select to silence the React hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "delta_client.request has a redundant `time_in_force` default in models plus explicit set in trading.py; harmless but duplicative.",
+    "auth.logout only reads the cookie; consider also honoring Authorization Bearer for API-token clients.",
+    "SettingsIn allows partial updates but PUT /api/settings won't unset fields (only $set). Acceptable given defaults.",
+    "delta_client is created once with global httpx.AsyncClient inside each call — fine for low traffic but could be pooled.",
+    "trading.place_order stores the entire Delta 'raw' response in Mongo; may bloat if the raw payload is large. Consider stripping."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (30/30)", "frontend": "~95% (10/11 flows; 1 minor UX lag)"},
+  "test_credentials": "Seeded via MongoDB per /app/auth_testing.md. FE session used during playwright: session_token=test_session_fe_1786797222223, user_id=test-user-fe-1786797222223 (test_database). BE regression session bootstrapped per-run inside the pytest fixture and cleaned up after.",
+  "seed_data_creation": "Two throwaway test users + user_sessions in test_database.users / test_database.user_sessions (TEST_ prefixed for the pytest run; auto-cleaned by fixture teardown). Broker connection was written/removed as part of the flow.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file at /app/backend/tests/backend_test.py — run with `cd /app/backend && REACT_APP_BACKEND_URL=<url> pytest tests/backend_test.py -v`. Auth seed pattern is documented in /app/auth_testing.md (Mongo user + user_sessions insert, then Bearer or cookie). Delta /test endpoint returns 4xx (as expected with restricted keys) but the signing pipeline is verified not to crash. Broker save/read/delete + strategies auto-seed + engine start/stop + logs population are all working. The only minor UX bug is the nav engine-status polling lag.",
+  "rca of the issue": "Nav engine-status lag RCA: Layout.jsx has its own useEffect polling engineApi.get() every 10s in isolation from Dashboard's local engine state. When Dashboard toggles the engine, only its local state is refreshed via `load()`. Fix: lift engine state into AuthContext or a dedicated context, or emit a custom event from Dashboard that Layout listens to. Reproduction: Log in with a seeded cookie, open /dashboard, click engine-start-btn. Dashboard immediately shows Stop Engine button, but the top-right 'Engine Idle' badge remains Idle for up to 10s."
+}

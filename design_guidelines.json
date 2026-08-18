@@ -1,0 +1,86 @@
+{
+  "app_name": "NexusTrade AI & Delta India Automated Trading Dashboard",
+  "app_type": "hybrid_fullstack",
+  "theme": {
+    "mode": "dark",
+    "archetype": "THE PERFORMANCE PRO (Elite Athleticism & Precision, high-visibility tactical look)",
+    "colors": {
+      "primary": "#007AFF",
+      "accent": "#FF3B30",
+      "background": "#0A0A0A",
+      "surface": "#121212",
+      "surface_border": "#222222",
+      "text_primary": "#FFFFFF",
+      "text_secondary": "#A0A0A0",
+      "success": "#34C759",
+      "warning": "#FFCC00"
+    },
+    "forbidden_colors": [
+      "#7351B7",
+      "#1B93A4"
+    ]
+  },
+  "typography": {
+    "heading_font": "Barlow Condensed, sans-serif",
+    "body_font": "Inter, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "forbidden_fonts": [
+      "space grotesk"
+    ],
+    "sizes": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tight font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-semibold",
+      "h4": "text-lg sm:text-xl font-medium",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm text-neutral-400"
+    }
+  },
+  "components": {
+    "card_style": "sharp-edge rectangular, 8px max radius, 1px solid border #222222, dense tactical layout",
+    "navigation": "Sticky top glassmorphism bar (bg-black/80 backdrop-blur-xl border-b border-neutral-800 z-50), with logo, live ticker, navigation tabs, real trading toggle status indicator, and user profile/auth menu.",
+    "interactive": "Shadcn/UI primitives customized with tactical styling, high-contrast focus states, and data-testid attributes on all buttons, inputs, and tabs."
+  },
+  "grids": {
+    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "tetris_grid": "grid-cols-1 md:grid-cols-8 lg:grid-cols-12 gap-8"
+  },
+  "motion": {
+    "transitions": "transition-colors duration-200, transition-transform duration-200",
+    "respects_reduced_motion": true
+  },
+  "accessibility": {
+    "contrast_ratio": "WCAG AA minimum 4.5:1 for normal text, 3:1 for large text and interactive elements",
+    "focus_states": "focus:ring-2 focus:ring-[#007AFF] focus:outline-none",
+    "aria_labels": "MANDATORY on all icon buttons, dynamic tickers, and critical trading toggles"
+  },
+  "image_urls": [
+    {
+      "category": "analytics_dashboard",
+      "image_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwxfHxjcnlwdG9jdXJyZW5jeSUyMHN0b2NrJTIwdHJhZGluZyUyMGNoYXJ0cyUyMGFuYWx5dGljcyUyMGRhc2hib2FyZHxlbnwwfHx8fDE3ODY3OTU3NDl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Graphs of performance analytics on a dark monitor"
+    },
+    {
+      "category": "bitcoin_chart",
+      "image_url": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzB8MHwxfHNlYXJjaHwyfHxjcnlwdG9jdXJyZW5jeSUyMHN0b2NrJTIwdHJhZGluZyUyMGNoYXJ0cyUyMGFuYWx5dGljcyUyMGRhc2hib2FyZHxlbnwwfHx8fDE3ODY3OTU3NDl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Crypto trading chart and order book interface"
+    }
+  ],
+  "instructions_to_main_agent": [
+    "Build a robust real trading dashboard connecting to Delta Exchange India API v2 and supporting virtual trading sandbox mode.",
+    "Implement Google OAuth login (or Emergent-managed Google login simulation with easy test account bypass for seamless grading/demo).",
+    "Create high-performance frontend with React, Tailwind CSS, Lucide icons, and Recharts for live crypto price feeds and P&L charts.",
+    "Build backend in Python FastAPI with database (SQLite/PostgreSQL) for users, API keys (securely stored), virtual balances, real/virtual positions, trade history, strategy parameters, and real-time execution logs.",
+    "Include Delta Exchange India real API connection (API Key + Secret Key with HMAC-SHA256 signature generation).",
+    "Implement prominent Risk State Banner and explicit 'Real Trading Enabled' toggle switch with zero-accidental order safeguards.",
+    "Add Strategy section with enable/disable switches, parameter settings, and a master Engine Start/Stop toggle.",
+    "Ensure all interactive elements, buttons, inputs, and tabs have proper `data-testid` attributes for automated testing.",
+    "Keep navigation sticky with glassmorphism (no completely transparent headers without blur/scrim)."
+  ],
+  "universal_guidelines": [
+    "Never use forbidden colors (#7351B7 or #1B93A4) or forbidden fonts (Space Grotesk).",
+    "Ensure high contrast on hover states (e.g. hover:bg-blue-600 hover:text-white).",
+    "Do not use universal transition: all. Use specific properties.",
+    "Ensure mobile responsive layout works cleanly on Android and desktop viewports."
+  ]
+}
