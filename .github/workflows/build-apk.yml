@@ -74,7 +74,10 @@ jobs:
           if [ -z "$REPO_NAME" ]; then
             REPO_NAME="nexustrade"
           fi
-          SAFE_REPO=$(echo "$REPO_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          SAFE_REPO=$(echo "$REPO_NAME" | tr -cd 'a-zA-Z0-9._-')
+          if [ -z "$SAFE_REPO" ]; then
+            SAFE_REPO="app"
+          fi
           ASSET_NAME="${SAFE_REPO}-debug-build-${RUN_NUM}.apk"
           
           mkdir -p /tmp/release_asset
@@ -92,21 +95,25 @@ jobs:
           TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
           TITLE="Debug APK Build #${{ github.run_number }}"
           
+          cat << 'EOF' > /tmp/release_notes.md
+          ### Automated Debug APK Build
+
+          - Run Number: #${{ github.run_number }}
+          - Attempt: #${{ github.run_attempt }}
+          - Commit: ${{ github.sha }}
+          - Asset: ${{ steps.prepare_asset.outputs.asset_name }}
+
+          Installation Instructions:
+          1. Download the .apk asset below to your Android device.
+          2. Open the file and tap Install (allow 'Install Unknown Apps' if prompted).
+          3. If Play Protect appears, tap 'More details' -> 'Install anyway'.
+          EOF
+          
           gh release create "$TAG" "${{ steps.prepare_asset.outputs.asset_path }}" \
             --title "$TITLE" \
             --target "${{ github.sha }}" \
             --latest \
-            --notes "### 🚀 Automated Debug APK Build
-
-- **Run Number**: #${{ github.run_number }}
-- **Attempt**: #${{ github.run_attempt }}
-- **Commit**: \`${{ github.sha }}\`
-- **Asset**: \`${{ steps.prepare_asset.outputs.asset_name }}\`
-
-> 📱 **Installation Instructions:**
-> 1. Download the \`.apk\` asset below to your Android device.
-> 2. Open the file and tap **Install** (allow *Install Unknown Apps* if prompted by Chrome/Files).
-> 3. If Play Protect appears, tap **More details** > **Install anyway**."
+            --notes-file /tmp/release_notes.md
 
       - name: Report APK download result
         if: always()
@@ -116,12 +123,12 @@ jobs:
           TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
           REPO_URL="${{ github.server_url }}/${{ github.repository }}"
           
-          if [ "${{ steps.create_release.outcome }}" == "success" ]; then
-            echo "### ✅ Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.create_release.outcome }}" = "success" ]; then
+            echo "### Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
             echo "Download your APK directly from the Releases page: [View Release](${REPO_URL}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
             echo "Asset name: \`${{ steps.prepare_asset.outputs.asset_name }}\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "### ⚠️ GitHub Actions Artifact Ready" >> $GITHUB_STEP_SUMMARY
-            echo "The APK was successfully compiled and is available under the **Artifacts** section as \`app-debug-apk\`." >> $GITHUB_STEP_SUMMARY
-            echo "If the release failed due to permissions, ensure **Settings > Actions > General > Workflow permissions** is set to **Read and write permissions**." >> $GITHUB_STEP_SUMMARY
+            echo "### GitHub Actions Artifact Ready" >> $GITHUB_STEP_SUMMARY
+            echo "The APK was successfully compiled and is available under the Artifacts section as app-debug-apk." >> $GITHUB_STEP_SUMMARY
+            echo "If the release failed due to permissions, ensure Settings > Actions > General > Workflow permissions is set to Read and write permissions." >> $GITHUB_STEP_SUMMARY
           fi
