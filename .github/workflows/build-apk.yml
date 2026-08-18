@@ -18,23 +18,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up Temurin Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Verify Java environment
         run: |
           java -version
           echo "JAVA_HOME=$JAVA_HOME"
+          JAVA_MAJOR=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}' | awk -F '.' '{print $1}')
+          echo "Detected Java Major Version: $JAVA_MAJOR"
+          if [ -z "$JAVA_MAJOR" ] || [ "$JAVA_MAJOR" -lt 17 ]; then
+            echo "::error::Java 17 or higher is required, but detected: $JAVA_MAJOR"
+            exit 1
+          fi
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '9.3.1'
 
-      - name: Create debug keystore if missing
+      - name: Create temporary debug keystore
         run: |
           if [ ! -f ./debug.keystore ]; then
             echo "Creating debug keystore..."
@@ -46,43 +52,43 @@ jobs:
           test -f ./debug.keystore
 
       - name: Build Debug APK
-        run: |
-          echo "Attempting to build APK..."
-          gradle assembleDebug --stacktrace --no-daemon || gradle :app:assembleDebug --stacktrace --no-daemon
+        run: gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK existence
         id: verify_apk
         run: |
-          echo "Searching for generated APK files..."
-          find . -name "*.apk" -type f
-          
-          APK_FILE=$(find . -name "*debug*.apk" -type f | head -n 1)
-          if [ -z "$APK_FILE" ]; then
-            APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+            echo "Found exact APK: app/build/outputs/apk/debug/app-debug.apk"
+            echo "apk_path=app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_OUTPUT
+          else
+            echo "Searching only inside app/build/outputs/apk..."
+            find app/build/outputs/apk -name "*.apk" || true
+            APK_FILE=$(find app/build/outputs/apk -name "*debug*.apk" -type f | head -n 1)
+            if [ -z "$APK_FILE" ]; then
+              APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+            fi
+            if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+              echo "::error::No APK file found after build!"
+              exit 1
+            fi
+            echo "Discovered APK: $APK_FILE"
+            echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
           fi
-          
-          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
-            echo "::error::No APK file found after build!"
-            exit 1
-          fi
-          
-          echo "Discovered APK: $APK_FILE"
-          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
 
-      - name: Upload Debug APK Artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
           path: ${{ steps.verify_apk.outputs.apk_path }}
           if-no-files-found: error
 
-      - name: Prepare APK Release Asset
+      - name: Prepare APK release asset
         id: prepare_asset
         run: |
           RUN_NUM="${{ github.run_number }}"
           REPO_NAME="${{ github.event.repository.name }}"
           if [ -z "$REPO_NAME" ]; then
-            REPO_NAME="nexustrade"
+            REPO_NAME="app"
           fi
           SAFE_REPO=$(echo "$REPO_NAME" | tr -cd 'a-zA-Z0-9._-')
           if [ -z "$SAFE_REPO" ]; then
@@ -108,17 +114,21 @@ jobs:
           cat << 'EOF' > /tmp/release_notes.md
           ### Automated Debug APK Build
 
-          - Run Number: #${{ github.run_number }}
-          - Attempt: #${{ github.run_attempt }}
-          - Commit: ${{ github.sha }}
-          - Asset: ${{ steps.prepare_asset.outputs.asset_name }}
+          - **Build Run**: #${{ github.run_number }}
+          - **Attempt**: #${{ github.run_attempt }}
+          - **Commit**: `${{ github.sha }}`
+          - **Asset**: `${{ steps.prepare_asset.outputs.asset_name }}`
 
-          Installation Instructions:
-          1. Download the .apk asset below to your Android device.
-          2. Open the file and tap Install (allow 'Install Unknown Apps' if prompted).
-          3. If Play Protect appears, tap 'More details' -> 'Install anyway'.
+          *This is an automatically generated debug APK for testing.*
+
+          #### 📱 How to install on Android:
+          1. Download the `.apk` file below directly to your Android device.
+          2. Open the downloaded file and tap **Install**.
+          3. If prompted with *"Install unknown apps"*, allow permission in Settings.
+          4. If Google Play Protect appears, tap **More details** ➔ **Install anyway**.
           EOF
           
+          gh --version
           gh release create "$TAG" "${{ steps.prepare_asset.outputs.asset_path }}" \
             --title "$TITLE" \
             --target "${{ github.sha }}" \
@@ -134,11 +144,11 @@ jobs:
           REPO_URL="${{ github.server_url }}/${{ github.repository }}"
           
           if [ "${{ steps.create_release.outcome }}" = "success" ]; then
-            echo "### Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "### ✅ Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
             echo "Download your APK directly from the Releases page: [View Release](${REPO_URL}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
             echo "Asset name: \`${{ steps.prepare_asset.outputs.asset_name }}\`" >> $GITHUB_STEP_SUMMARY
           else
-            echo "### GitHub Actions Artifact Ready" >> $GITHUB_STEP_SUMMARY
-            echo "The APK was successfully compiled and is available under the Artifacts section as app-debug-apk." >> $GITHUB_STEP_SUMMARY
-            echo "If the release failed due to permissions, ensure Settings > Actions > General > Workflow permissions is set to Read and write permissions." >> $GITHUB_STEP_SUMMARY
+            echo "### ⚠️ Debug APK Artifact Ready" >> $GITHUB_STEP_SUMMARY
+            echo "The APK was successfully compiled and is available under the **Artifacts** section as \`app-debug-apk\`." >> $GITHUB_STEP_SUMMARY
+            echo "If the release failed due to permissions, ensure **Settings > Actions > General > Workflow permissions** is set to **Read and write permissions**." >> $GITHUB_STEP_SUMMARY
           fi
