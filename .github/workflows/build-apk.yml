@@ -1,0 +1,127 @@
+name: Build & Release Debug APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Verify Java environment
+        run: |
+          java -version
+          echo "JAVA_HOME=$JAVA_HOME"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Create debug keystore if missing
+        run: |
+          if [ ! -f ./debug.keystore ]; then
+            echo "Creating debug keystore..."
+            keytool -genkey -v -keystore ./debug.keystore \
+              -alias androiddebugkey -keyalg RSA -keysize 2048 \
+              -validity 10000 -storepass android -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          test -f ./debug.keystore
+
+      - name: Build Debug APK
+        run: gradle assembleDebug --stacktrace --no-daemon
+
+      - name: Verify APK existence
+        id: verify_apk
+        run: |
+          APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
+            echo "::error::No APK file found after build!"
+            exit 1
+          fi
+          echo "Discovered APK: $APK_FILE"
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: ${{ steps.verify_apk.outputs.apk_path }}
+          if-no-files-found: error
+
+      - name: Prepare APK Release Asset
+        id: prepare_asset
+        run: |
+          RUN_NUM="${{ github.run_number }}"
+          REPO_NAME="${{ github.event.repository.name }}"
+          if [ -z "$REPO_NAME" ]; then
+            REPO_NAME="nexustrade"
+          fi
+          SAFE_REPO=$(echo "$REPO_NAME" | sed 's/[^a-zA-Z0-9._-]/_/g')
+          ASSET_NAME="${SAFE_REPO}-debug-build-${RUN_NUM}.apk"
+          
+          mkdir -p /tmp/release_asset
+          cp "${{ steps.verify_apk.outputs.apk_path }}" "/tmp/release_asset/${ASSET_NAME}"
+          
+          echo "asset_path=/tmp/release_asset/${ASSET_NAME}" >> $GITHUB_OUTPUT
+          echo "asset_name=${ASSET_NAME}" >> $GITHUB_OUTPUT
+
+      - name: Publish APK to GitHub Releases
+        id: create_release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          TITLE="Debug APK Build #${{ github.run_number }}"
+          
+          gh release create "$TAG" "${{ steps.prepare_asset.outputs.asset_path }}" \
+            --title "$TITLE" \
+            --target "${{ github.sha }}" \
+            --latest \
+            --notes "### 🚀 Automated Debug APK Build
+
+- **Run Number**: #${{ github.run_number }}
+- **Attempt**: #${{ github.run_attempt }}
+- **Commit**: \`${{ github.sha }}\`
+- **Asset**: \`${{ steps.prepare_asset.outputs.asset_name }}\`
+
+> 📱 **Installation Instructions:**
+> 1. Download the \`.apk\` asset below to your Android device.
+> 2. Open the file and tap **Install** (allow *Install Unknown Apps* if prompted by Chrome/Files).
+> 3. If Play Protect appears, tap **More details** > **Install anyway**."
+
+      - name: Report APK download result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="debug-apk-build-${{ github.run_number }}-${{ github.run_attempt }}"
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+          
+          if [ "${{ steps.create_release.outcome }}" == "success" ]; then
+            echo "### ✅ Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
+            echo "Download your APK directly from the Releases page: [View Release](${REPO_URL}/releases/tag/${TAG})" >> $GITHUB_STEP_SUMMARY
+            echo "Asset name: \`${{ steps.prepare_asset.outputs.asset_name }}\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ⚠️ GitHub Actions Artifact Ready" >> $GITHUB_STEP_SUMMARY
+            echo "The APK was successfully compiled and is available under the **Artifacts** section as \`app-debug-apk\`." >> $GITHUB_STEP_SUMMARY
+            echo "If the release failed due to permissions, ensure **Settings > Actions > General > Workflow permissions** is set to **Read and write permissions**." >> $GITHUB_STEP_SUMMARY
+          fi
