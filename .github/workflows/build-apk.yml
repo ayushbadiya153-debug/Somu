@@ -46,16 +46,26 @@ jobs:
           test -f ./debug.keystore
 
       - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon
+        run: |
+          echo "Attempting to build APK..."
+          gradle assembleDebug --stacktrace --no-daemon || gradle :app:assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK existence
         id: verify_apk
         run: |
-          APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          echo "Searching for generated APK files..."
+          find . -name "*.apk" -type f
+          
+          APK_FILE=$(find . -name "*debug*.apk" -type f | head -n 1)
+          if [ -z "$APK_FILE" ]; then
+            APK_FILE=$(find . -name "*.apk" -type f | head -n 1)
+          fi
+          
           if [ -z "$APK_FILE" ] || [ ! -f "$APK_FILE" ]; then
             echo "::error::No APK file found after build!"
             exit 1
           fi
+          
           echo "Discovered APK: $APK_FILE"
           echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
 
